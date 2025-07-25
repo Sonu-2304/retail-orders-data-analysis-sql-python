@@ -79,20 +79,53 @@ retail-sales-analysis/
 ## 💡 Sample SQL Queries
 
 ```sql
--- Top 5 highest-selling products
-SELECT product_name, SUM(sale_price) AS total_sales
-FROM sales_data
-GROUP BY product_name
-ORDER BY total_sales DESC
-LIMIT 5;
-
--- Month-over-month sales growth
+-- 📅 Month-over-month sales comparison between 2022 and 2023
+WITH CTE AS (
+    SELECT 
+        YEAR(ORDER_DATE) AS YEAR,
+        MONTH(ORDER_DATE) AS MONTH,
+        SUM(sale_price) AS SALES
+    FROM DF_ORDERS
+    GROUP BY YEAR(ORDER_DATE), MONTH(ORDER_DATE)
+)
 SELECT 
-    FORMAT(order_date, 'yyyy-MM') AS month,
-    SUM(sale_price) AS monthly_sales
-FROM sales_data
-GROUP BY FORMAT(order_date, 'yyyy-MM')
-ORDER BY month;
+    MONTH, 
+    SUM(CASE WHEN YEAR = 2022 THEN SALES ELSE 0 END) AS SALE_2022,
+    SUM(CASE WHEN YEAR = 2023 THEN SALES ELSE 0 END) AS SALE_2023,
+    (SUM(CASE WHEN YEAR = 2023 THEN SALES ELSE 0 END) - 
+     SUM(CASE WHEN YEAR = 2022 THEN SALES ELSE 0 END)) AS SALE_DIFFERENCE,
+    ROUND(
+        (SUM(CASE WHEN YEAR = 2023 THEN SALES ELSE 0 END) - 
+         SUM(CASE WHEN YEAR = 2022 THEN SALES ELSE 0 END)) * 100.0 / 
+        NULLIF(SUM(CASE WHEN YEAR = 2022 THEN SALES ELSE 0 END), 0),
+        2
+    ) AS PERCENT_GROWTH
+FROM CTE
+GROUP BY MONTH
+ORDER BY MONTH;
+
+-- 📈 Which sub-category had the highest sales growth from 2022 to 2023
+WITH CTE1 AS (
+    SELECT 
+        SUB_CATEGORY, 
+        YEAR(ORDER_DATE) AS YEAR, 
+        SUM(sale_price) AS SALES
+    FROM DF_ORDERS
+    GROUP BY SUB_CATEGORY, YEAR(ORDER_DATE)
+),
+CTE2 AS (
+    SELECT 
+        SUB_CATEGORY,
+        SUM(CASE WHEN YEAR = 2022 THEN SALES ELSE 0 END) AS SALE_2022,
+        SUM(CASE WHEN YEAR = 2023 THEN SALES ELSE 0 END) AS SALE_2023
+    FROM CTE1
+    GROUP BY SUB_CATEGORY
+)
+SELECT TOP 1 *, 
+       (SALE_2023 - SALE_2022) * 100.0 / NULLIF(SALE_2022, 0) AS GROWTH_PERCENT
+FROM CTE2
+ORDER BY GROWTH_PERCENT DESC;
+
 ```
 
 ---
